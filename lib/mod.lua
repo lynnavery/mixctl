@@ -18,7 +18,7 @@ local state = {
   last = {},
   sig = nil,
   vu = { 0, 0, 0, 0 },
-  osc_orig = nil,
+  vu_chained = {},
   osc_wrapped = nil,
   metro = nil,
   ticks = 0,
@@ -26,18 +26,22 @@ local state = {
 
 -- sidecar process ------------------------------------------------------------
 
+-- the [m] keeps pgrep/pkill from matching the `sh -c` running them
+local PGREP_PATTERN = "'[m]ixctl/server/mixctl.py'"
+
 local function server_running()
-  return util.os_capture("pgrep -f 'mixctl/server/mixctl.py'") ~= ""
+  return util.os_capture("pgrep -f " .. PGREP_PATTERN) ~= ""
 end
 
 local function start_server()
   if server_running() then return end
-  os.execute("cd " .. MOD_DIR .. " && nohup python3 server/mixctl.py --port " .. PORT ..
+  -- absolute path so the pattern above matches the process
+  os.execute("nohup python3 " .. MOD_DIR .. "server/mixctl.py --port " .. PORT ..
     " > /tmp/mixctl.log 2>&1 &")
 end
 
 local function stop_server()
-  os.execute("pkill -f 'mixctl/server/mixctl.py'")
+  os.execute("pkill -f " .. PGREP_PATTERN)
 end
 
 local function load_settings()
@@ -108,25 +112,36 @@ end
 
 local function wrap_osc()
   if osc.event ~= nil and osc.event == state.osc_wrapped then return end
-  state.osc_orig = osc.event
+  -- capture per wrapper: if something wraps us and we re-wrap, reading a
+  -- shared variable at call time would loop forever
+  local orig = osc.event
   state.osc_wrapped = function(path, args, from)
     if type(path) == "string" and path:sub(1, 8) == "/mixctl/" then
       if state.enabled then handle(path, args) end
       return
     end
-    if state.osc_orig then return state.osc_orig(path, args, from) end
+    if orig then return orig(path, args, from) end
   end
   osc.event = state.osc_wrapped
 end
 
 -- metering + polling ---------------------------------------------------------
 
+-- each poll has a single callback; chain onto whatever the script set in
+-- init() rather than replacing it, and leave its rate alone if it has one
 local function start_polls()
   local names = { "amp_in_l", "amp_in_r", "amp_out_l", "amp_out_r" }
   for i, name in ipairs(names) do
-    local ok, p = pcall(poll.set, name, function(v) state.vu[i] = v end)
-    if ok and p then
-      p.time = 0.05
+    local p = poll.polls and poll.polls[name]
+    if p and (p.callback == nil or p.callback ~= state.vu_chained[name]) then
+      local prev = p.callback
+      local cb = function(v)
+        state.vu[i] = v
+        if prev then prev(v) end
+      end
+      state.vu_chained[name] = cb
+      p.callback = cb
+      if not prev then p.time = 0.05 end
       p:start()
     end
   end
@@ -211,7 +226,11 @@ menu.key = function(n, z)
       start_runtime()
     else
       stop_server()
-      if state.metro then state.metro:stop() end
+      if state.metro then
+        state.metro:stop()
+        metro.free(state.metro.id)
+        state.metro = nil
+      end
       osc.send(SCLANG, "/mixctl/cleanup", {})
     end
     menu.running = server_running()

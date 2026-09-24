@@ -57,7 +57,8 @@ cd web && npm install
 npm run mock      # sidecar with fake topology, jack graph and meters
 npm run dev       # vite dev server, proxies /events and /api to the mock
 npm run build     # writes ../www (committed, so the norns needs no node)
-lua test/run.lua  # off-device check of lib/topology.lua; regenerates the mock graph
+lua test/run.lua       # off-device check of lib/topology.lua; regenerates the mock graph
+lua test/mod_test.lua  # osc.event wrapping, poll chaining, param set
 ```
 
 Deploy to the norns without the web sources:
