@@ -38,8 +38,8 @@ browser ──HTTP/SSE──▶ server/mixctl.py (python3, stdlib only, :8740)
 - `lib/mod.lua` starts the sidecar at boot. On every script init it rebuilds
   the graph (`lib/topology.lua`) and writes it to `/tmp/mixctl_topology.json`.
   A 10 Hz metro forwards crone in/out levels and any changed param values.
-- `lib/MixCtl.sc` meters SC main out, send A, send B and the fx insert bus from
-  a group at the root tail.
+- `lib/MixCtl.sc` meters SC out [0,1] (read after any fx inserts), send A and
+  send B from a group at the root tail, which runs after `FxSetup.fxGroup`.
 - `lib/adapters.lua` maps nb voices to their level, pan and send params
   (mxsynths, smpKit, emplaitress, plus a name-based guess for other voices).
 
@@ -47,6 +47,11 @@ browser ──HTTP/SSE──▶ server/mixctl.py (python3, stdlib only, :8740)
 
 - nb voices and the engine all sum onto SC's main out, so meters are per bus
   and per crone channel, not per voice.
+- Several fx in the insert slot run in series in the order they were
+  switched on. mixctl can't see that order and draws them alphabetically.
+- The main out node has no meter. The only crone output level is the VU stream
+  the MIX menu turns on. The `amp_out` polls meter `Crone.context.out_b`, which
+  is the engine's output bus, so that meter is on the engine node.
 - Softcut voice levels aren't shown (softcut has no getters). Softcut appears
   as a single channel.
 

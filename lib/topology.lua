@@ -100,12 +100,14 @@ function topology.build()
 
   node("src:adc", "source", "audio in", 0, { meter = "crone_in" })
   node("src:tape", "source", "tape play", 0)
-  node("sink:dac", "sink", "audio out", 7, { meter = "crone_out" })
+  node("sink:dac", "sink", "audio out", 7)
 
   -- supercollider -----------------------------------------------------------
 
   local ename = (engine and engine.name) or "none"
-  node("sc:engine", "engine", "engine: " .. tostring(ename), 1)
+  -- the amp_out_* polls meter Crone.context.out_b, which only engines that
+  -- write to out_b use; nb voices and fx write straight to SC out [0,1]
+  node("sc:engine", "engine", "engine: " .. tostring(ename), 1, { meter = "eng_outb" })
 
   local voices, inactive = {}, {}
   local refs = rawget(_G, "nb_player_refcounts") or {}
@@ -210,8 +212,9 @@ function topology.build()
       ctl({ "rev_hf_damping" }, "param", "hf damp"),
     }),
   })
+  -- no meter: crone's own output level isn't reachable from lua without the
+  -- MIX menu's vu stream (see README)
   node("crone:out", "master", "main out", 7, {
-    meter = "crone_out",
     controls = compact({
       ctl({ "output", "output_level" }, "level", "output"),
       ctl({ "compressor" }, "enable", "compressor"),
@@ -222,7 +225,9 @@ function topology.build()
     }),
   })
 
-  -- sc output: main bus (through any inserts) -> crone engine channel
+  -- sc output: main bus (through any inserts) -> crone engine channel.
+  -- inserts run in series in activation order (each is added to the tail of
+  -- FxSetup.insertGroup), which params can't tell us; this order is alphabetical
   local prev = "bus:sc_main"
   for _, fid in ipairs(inserts) do
     edge(prev, fid, "insert", nil, "insert")
@@ -231,6 +236,7 @@ function topology.build()
   edge(prev, "crone:eng")
 
   edge("src:adc", "crone:input")
+  edge("crone:input", "sc:engine", "audio", nil, "eng in (pre-monitor)")
   edge("crone:input", "crone:monitor")
   edge("crone:monitor", "crone:out")
   edge("src:tape", "crone:tape")

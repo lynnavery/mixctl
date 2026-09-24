@@ -224,7 +224,7 @@ def udp_loop(hub, sock):
             hub.last_matron = time.time()
             # polls give amplitude only; use it for both peak and rms
             hub.set_meter("crone_in", [args[0], args[0], args[1], args[1]])
-            hub.set_meter("crone_out", [args[2], args[2], args[3], args[3]])
+            hub.set_meter("eng_outb", [args[2], args[2], args[3], args[3]])
         elif path == "/mixctl/param" and len(args) >= 5:
             hub.last_matron = time.time()
             value = None if args[2] == -999 else args[2]
@@ -268,7 +268,6 @@ def mock_jack():
         "system": ["capture_1", "capture_2", "playback_1", "playback_2"],
         "crone": ["input_%d" % i for i in range(1, 7)] + ["output_%d" % i for i in range(1, 7)],
         "SuperCollider": ["in_1", "in_2", "out_1", "out_2"],
-        "softcut": ["input_1", "input_2", "output_1", "output_2"],
     }
     ports = []
     for client, ps in names.items():
@@ -277,11 +276,9 @@ def mock_jack():
             ports.append({"name": "%s:%s" % (client, p), "dir": "out" if is_out else "in"})
     pairs = [
         ("system:capture_1", "crone:input_1"), ("system:capture_2", "crone:input_2"),
-        ("SuperCollider:out_1", "crone:input_3"), ("SuperCollider:out_2", "crone:input_4"),
-        ("softcut:output_1", "crone:input_5"), ("softcut:output_2", "crone:input_6"),
+        ("SuperCollider:out_1", "crone:input_5"), ("SuperCollider:out_2", "crone:input_6"),
         ("crone:output_1", "system:playback_1"), ("crone:output_2", "system:playback_2"),
-        ("crone:output_3", "SuperCollider:in_1"), ("crone:output_4", "SuperCollider:in_2"),
-        ("crone:output_5", "softcut:input_1"), ("crone:output_6", "softcut:input_2"),
+        ("crone:output_5", "SuperCollider:in_1"), ("crone:output_6", "SuperCollider:in_2"),
     ]
     extra = getattr(mock_jack, "extra", set())
     removed = getattr(mock_jack, "removed", set())
@@ -299,7 +296,7 @@ def mock_meters(hub):
     t0 = time.time()
     while True:
         t = time.time() - t0
-        for i, key in enumerate(["crone_in", "crone_out", "sc_main", "sc_sendA", "sc_sendB"]):
+        for i, key in enumerate(["crone_in", "eng_outb", "sc_main", "sc_sendA", "sc_sendB"]):
             env = 0.5 + 0.5 * math.sin(t * (0.7 + i * 0.3))
             peak = min(1.0, env * (0.6 + 0.4 * random.random()))
             hub.set_meter(key, [peak, peak * 0.5, peak * 0.9, peak * 0.45])

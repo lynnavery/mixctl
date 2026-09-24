@@ -2,13 +2,13 @@
 //
 // sclang compiles every .sc under dust/code, even for disabled mods, so this
 // file must not reference optional classes (e.g. FxSetup) by name. fx mod
-// buses are found through ~sendA / ~sendB and a runtime class lookup.
+// send buses are found through ~sendA / ~sendB.
 
 MixCtl {
 	classvar <group, <synths, <sidecar, <ids;
 
 	*initClass {
-		ids = [\sc_main, \sc_sendA, \sc_sendB, \sc_wet];
+		ids = [\sc_main, \sc_sendA, \sc_sendB];
 		synths = [];
 		StartUp.add {
 			sidecar = NetAddr("127.0.0.1", 8740);
@@ -36,16 +36,14 @@ MixCtl {
 
 	*build {
 		var s = Server.default;
-		var fxClass = \FxSetup.asClass;
 		var buses = [
 			s.outputBus.index,
 			this.busIndex(topEnvironment[\sendA]),
-			this.busIndex(topEnvironment[\sendB]),
-			if (fxClass.notNil, { this.busIndex(fxClass.wet) }, { nil })
+			this.busIndex(topEnvironment[\sendB])
 		];
 		this.free;
-		// root tail runs after the default group, so it sees every writer,
-		// including fx inserts
+		// root tail runs after the default group (and FxSetup.fxGroup at its
+		// tail), so bus 0 is read post-insert and the sends see every writer
 		group = Group.new(RootNode(s), \addToTail);
 		buses.do { |index, i|
 			if (index.notNil, {
