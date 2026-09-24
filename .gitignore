@@ -1,0 +1,3 @@
+__pycache__/
+*.tsbuildinfo
+.DS_Store
