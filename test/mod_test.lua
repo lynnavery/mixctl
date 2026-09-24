@@ -81,6 +81,19 @@ osc.event("/mixctl/set", { "script", "x_amp", "raw", 0.25 }, {})
 assert(#script_osc == before, "/mixctl/ leaked to script handler")
 assert(set_calls[#set_calls][1] == "raw" and set_calls[#set_calls][3] == 0.25, "set_raw not called")
 
+-- insert order reply from sclang: re-dump on change only
+local function count_dumps()
+  local n = 0
+  for _, m in ipairs(sent) do if m.path == "/mixctl/topology_changed" then n = n + 1 end end
+  return n
+end
+local d0 = count_dumps()
+osc.event("/mixctl/inserts", { "fx_a", "fx_b" }, {})
+assert(count_dumps() == d0 + 1, "new insert order should re-dump")
+osc.event("/mixctl/inserts", { "fx_a", "fx_b" }, {})
+assert(count_dumps() == d0 + 1, "same insert order should not re-dump")
+assert(#script_osc == before, "/mixctl/inserts leaked to script handler")
+
 -- repeated post_init (script reload) doesn't double-chain polls
 hooks.script_post_init()
 script_vu = {}

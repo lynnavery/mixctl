@@ -93,6 +93,9 @@ params:option("fx_grains_slot", "slot", slots, 3)
 params:control("fx_grains_slot_drywet", "dry/wet", 0, 1, 1)
 params:option("fx_ffbc_slot", "slot", slots, 4)
 params:control("fx_ffbc_slot_drywet", "dry/wet", 0, 1, 0.5)
+-- fx_llll: subpath "/fx_llll" but params are "fx_ll_*"
+params:option("fx_ll_slot", "slot", slots, 4)
+params:control("fx_ll_slot_drywet", "dry/wet", 0, 1, 0.5)
 
 note_players = { mxsynths = {}, ["emplait 1"] = {}, ["emplait 2"] = {}, smpKit = {}, ["midi: uno 1"] = {} }
 nb_player_refcounts = { mxsynths = 1, ["emplait 1"] = 2 }
@@ -117,9 +120,25 @@ local has = {}
 for _, e in ipairs(g.edges) do has[e.id] = e end
 assert(has["bus:sendA->fx:fx_dverb"], "dverb should be on send A")
 assert(has["bus:sendB->fx:fx_grains"], "grains should be on send B")
-assert(has["bus:sc_main->fx:fx_ffbc"] and has["fx:fx_ffbc->crone:eng"], "ffbc insert chain")
+-- no order from sclang yet: alphabetical, flagged as unknown
+assert(has["bus:sc_main->fx:fx_ffbc"] and has["fx:fx_ffbc->fx:fx_ll"] and has["fx:fx_ll->crone:eng"],
+  "alphabetical insert chain")
+assert(g.insert_order_known == false and has["bus:sc_main->fx:fx_ffbc"].label == "insert 1?")
 assert(has["nb:mxsynths->bus:sendA"].gain.id == "nb_mxsynths_send_a")
 assert(has["crone:eng->crone:rev"].gain.pset == "mix")
+
+-- sclang reports llll activated first: chain follows the node tree
+local g2 = topology.build({ "fx_llll", "fx_ffbc" })
+local has2 = {}
+for _, e in ipairs(g2.edges) do has2[e.id] = e end
+assert(has2["bus:sc_main->fx:fx_ll"] and has2["fx:fx_ll->fx:fx_ffbc"] and has2["fx:fx_ffbc->crone:eng"],
+  "insert chain should follow sclang order")
+assert(g2.insert_order_known and has2["bus:sc_main->fx:fx_ll"].label == "insert 1")
+assert(g2.inserts[1] == "fx:fx_ll" and g2.inserts[2] == "fx:fx_ffbc")
+
+-- a partial report (one insert unknown to sclang) keeps known ones first, flags it
+local g3 = topology.build({ "fx_ffbc" })
+assert(g3.inserts[1] == "fx:fx_ffbc" and not g3.insert_order_known)
 
 print(string.format("ok: %d nodes, %d edges, %d watched controls, sig=%s",
   #g.nodes, #g.edges, #watch, topology.signature()))

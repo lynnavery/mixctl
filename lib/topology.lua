@@ -68,7 +68,21 @@ local function compact(list)
   return out
 end
 
-function topology.build()
+-- which slot prefix an fx subpath name belongs to. usually equal
+-- (fx_dverb), but fx_llll's subpath is "fx_llll" and its params "fx_ll_*",
+-- so accept the longest prefix match
+local function prefix_for(name, prefixes)
+  local best
+  for _, prefix in ipairs(prefixes) do
+    if name == prefix then return prefix end
+    if name:sub(1, #prefix) == prefix and (not best or #prefix > #best) then best = prefix end
+  end
+  return best
+end
+
+-- insert_order: fx subpath names as sclang reports them from the node tree,
+-- first to last. without it, inserts fall back to alphabetical order.
+function topology.build(insert_order)
   local nodes, edges, watch = {}, {}, {}
   local by_id = {}
 
@@ -226,11 +240,28 @@ function topology.build()
   })
 
   -- sc output: main bus (through any inserts) -> crone engine channel.
-  -- inserts run in series in activation order (each is added to the tail of
-  -- FxSetup.insertGroup), which params can't tell us; this order is alphabetical
+  -- inserts run in series in node order, which only sclang knows
+  local order_known = false
+  if insert_order and #inserts > 0 then
+    local rank = {}
+    for i, name in ipairs(insert_order) do
+      local prefix = prefix_for(name, fx)
+      if prefix and not rank["fx:" .. prefix] then rank["fx:" .. prefix] = i end
+    end
+    order_known = true
+    for _, fid in ipairs(inserts) do
+      if not rank[fid] then order_known = false end
+    end
+    table.sort(inserts, function(a, b)
+      local ra, rb = rank[a] or math.huge, rank[b] or math.huge
+      if ra ~= rb then return ra < rb end
+      return a < b
+    end)
+  end
   local prev = "bus:sc_main"
-  for _, fid in ipairs(inserts) do
-    edge(prev, fid, "insert", nil, "insert")
+  for i, fid in ipairs(inserts) do
+    local label = #inserts > 1 and ("insert " .. i .. (order_known and "" or "?")) or "insert"
+    edge(prev, fid, "insert", nil, label)
     prev = fid
   end
   edge(prev, "crone:eng")
@@ -261,6 +292,8 @@ function topology.build()
     version = 1,
     script = (norns and norns.state and norns.state.name) or "",
     engine = ename,
+    inserts = inserts,
+    insert_order_known = order_known,
     voices_inactive = inactive,
     psets = {},
     nodes = nodes,

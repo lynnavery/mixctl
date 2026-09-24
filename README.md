@@ -48,7 +48,10 @@ browser ──HTTP/SSE──▶ server/mixctl.py (python3, stdlib only, :8740)
 - nb voices and the engine all sum onto SC's main out, so meters are per bus
   and per crone channel, not per voice.
 - Several fx in the insert slot run in series in the order they were
-  switched on. mixctl can't see that order and draws them alphabetically.
+  switched on. mixctl reads that order from the server's node tree
+  (`/g_queryTree` on `FxSetup.insertGroup`) and numbers the insert cables.
+  Until sclang answers, or if an insert's synth isn't found, the numbers get
+  a `?` and the order falls back to alphabetical.
 - The main out node has no meter. The only crone output level is the VU stream
   the MIX menu turns on. The `amp_out` polls meter `Crone.context.out_b`, which
   is the engine's output bus, so that meter is on the engine node.

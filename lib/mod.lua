@@ -19,6 +19,7 @@ local state = {
   sig = nil,
   vu = { 0, 0, 0, 0 },
   vu_chained = {},
+  insert_order = nil, -- fx subpath names from sclang's node tree
   osc_wrapped = nil,
   metro = nil,
   ticks = 0,
@@ -62,7 +63,7 @@ end
 
 local function dump()
   if not state.enabled then return end
-  local ok, g, watch = pcall(topology.build)
+  local ok, g, watch = pcall(topology.build, state.insert_order)
   if not ok then
     print("mixctl: topology build failed: " .. tostring(g))
     return
@@ -77,6 +78,8 @@ local function dump()
     f:close()
     osc.send(SIDECAR, "/mixctl/topology_changed", {})
   end
+  -- ask sclang for the real insert order; it answers with /mixctl/inserts
+  if #g.inserts > 0 then osc.send(SCLANG, "/mixctl/inserts", {}) end
 end
 
 -- send only the watched params whose display string changed since last tick
@@ -107,6 +110,14 @@ local function handle(path, args)
     end
   elseif path == "/mixctl/dump" then
     dump()
+  elseif path == "/mixctl/inserts" then
+    -- only re-dump on a change, so the dump -> query -> reply cycle settles
+    local order = {}
+    for i, name in ipairs(args) do order[i] = tostring(name) end
+    local new = table.concat(order, ",")
+    local old = state.insert_order and table.concat(state.insert_order, ",")
+    state.insert_order = order
+    if new ~= old then dump() end
   end
 end
 
