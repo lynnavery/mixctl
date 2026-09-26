@@ -2,8 +2,9 @@ import { useMemo, useState } from "react";
 import { Background, Controls, Handle, Position, ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
 import { type Jack, jackEdit, useStore } from "./store";
 
-// patchbay layout: every jack client is split into an outputs block (left
-// column) and an inputs block (right column), so the graph never loops back
+// patchbay layout: '
+// every jack client is split into an outputs block (left column) and an inputs block (right column), 
+// so the graph never loops back
 
 const PORT_H = 22;
 const HEAD_H = 30;
@@ -67,7 +68,7 @@ export function JackView() {
   const jack = useStore((s) => s.jack);
   const [edit, setEdit] = useState(false);
   const graph = useMemo(() => (jack ? build(jack) : null), [jack]);
-  if (!jack) return <div className="empty">waiting for jack graph…</div>;
+  if (!jack) return <div className="empty">waiting for jack graph...</div>;
   if (!jack.ok) return <div className="empty">jack unavailable: {jack.error}</div>;
   return (
     <div className="jack-wrap">
