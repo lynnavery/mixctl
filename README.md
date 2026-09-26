@@ -1,8 +1,8 @@
 # mixctl
 
-A norns mod that serves a network mix control panel at `http://<norns>:8740`:
+Norns internal audio routing was a bit confusing and no menus really show what is routing to where. This is a norns mod that serves a network mix control panel at `http://<norns>:8740`, with these pages:
 
-- **signal flow**: a React Flow graph of audio routing through the crone mixer
+- **signal flow**: a graph of audio routing through the crone mixer
   (input / monitor / engine / softcut / tape, reverb sends, output), the
   script's SuperCollider engine, active [nb](https://github.com/sixolet/nb)
   voices and their send A / B levels, and any mods built on the
@@ -57,22 +57,5 @@ browser ──HTTP/SSE──▶ server/mixctl.py (python3, stdlib only, :8740)
   is the engine's output bus, so that meter is on the engine node.
 - Softcut voice levels aren't shown (softcut has no getters). Softcut appears
   as a single channel.
-
-## development
-
-```
-cd web && npm install
-npm run mock      # sidecar with fake topology, jack graph and meters
-npm run dev       # vite dev server, proxies /events and /api to the mock
-npm run build     # writes ../www (committed, so the norns needs no node)
-lua test/run.lua       # off-device check of lib/topology.lua; regenerates the mock graph
-lua test/mod_test.lua  # osc.event wrapping, poll chaining, param set
-```
-
-Deploy to the norns without the web sources:
-
-```
-rsync -av --exclude web --exclude test --exclude .git ./ we@norns.local:~/dust/code/mixctl/
-```
 
 Logs: `/tmp/mixctl.log` on the norns.
