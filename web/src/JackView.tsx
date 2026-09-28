@@ -1,5 +1,16 @@
-import { useMemo, useState } from "react";
-import { Background, Controls, Handle, Position, ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  applyEdgeChanges,
+  applyNodeChanges,
+  Background,
+  Controls,
+  Handle,
+  Position,
+  ReactFlow,
+  type Edge,
+  type Node,
+  type NodeProps,
+} from "@xyflow/react";
 import { type Jack, jackEdit, useStore } from "./store";
 
 // patchbay layout: '
@@ -68,6 +79,18 @@ export function JackView() {
   const jack = useStore((s) => s.jack);
   const [edit, setEdit] = useState(false);
   const graph = useMemo(() => (jack ? build(jack) : null), [jack]);
+
+  // kept as local state (rather than passed straight from `graph`) so that
+  // selection changes from clicking a cable actually commit: react flow only
+  // applies node/edge changes (selection included) back onto controlled
+  // props via onNodesChange/onEdgesChange, it does not track them itself
+  const [nodes, setNodes] = useState<Node<BlockData>[]>([]);
+  const [edges, setEdges] = useState<Edge[]>([]);
+  useEffect(() => {
+    setNodes(graph?.nodes ?? []);
+    setEdges(graph?.edges ?? []);
+  }, [graph]);
+
   if (!jack) return <div className="empty">waiting for jack graph...</div>;
   if (!jack.ok) return <div className="empty">jack unavailable: {jack.error}</div>;
   return (
@@ -84,13 +107,15 @@ export function JackView() {
         </span>
       </div>
       <ReactFlow
-        nodes={graph!.nodes}
-        edges={graph!.edges}
+        nodes={nodes}
+        edges={edges}
         nodeTypes={nodeTypes}
         nodesConnectable={edit}
         edgesFocusable={edit}
         elementsSelectable={edit}
         deleteKeyCode={edit ? ["Backspace", "Delete"] : null}
+        onNodesChange={(changes) => setNodes((nds) => applyNodeChanges<Node<BlockData>>(changes, nds))}
+        onEdgesChange={(changes) => setEdges((eds) => applyEdgeChanges<Edge>(changes, eds))}
         onConnect={(c) => c.sourceHandle && c.targetHandle && jackEdit("connect", c.sourceHandle, c.targetHandle)}
         onEdgesDelete={(es) =>
           es.forEach((e) => e.sourceHandle && e.targetHandle && jackEdit("disconnect", e.sourceHandle, e.targetHandle))
